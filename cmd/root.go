@@ -83,6 +83,7 @@ func loadOrFetchNames() ([]string, error) {
 	return names, nil
 }
 
+// Execute is the entry point for running this command.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {

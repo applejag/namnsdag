@@ -29,8 +29,11 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// URL is the HTTP URL that namnsdag.Fetch will query.
 const URL = "https://www.dagensnamnsdag.nu/"
 
+// Fetch performs a HTTP GET request and parses the HTML response to extract
+// today's names.
 func Fetch() ([]string, error) {
 	doc, err := fetchDocument()
 	if err != nil {

@@ -33,6 +33,10 @@ type cache struct {
 	Names []string `json:"names"`
 }
 
+// LoadCache loads the cached names from ~/.cache/namnsdag/latest.json, or the
+// equivalent in other OS's cache directories (eg. %APPDATA%).
+//
+// It will return nil if there is no cache or if the cache is outdated.
 func LoadCache(today time.Time) ([]string, error) {
 	path, err := CacheFile()
 	if err != nil {
@@ -57,6 +61,11 @@ func LoadCache(today time.Time) ([]string, error) {
 	return cache.Names, nil
 }
 
+// SaveCache writes the cached names to ~/.cache/namnsdag/latest.json, or the
+// equivalent in other OS's cache directories (eg. %APPDATA%).
+//
+// Today's year, month, and day are used to automatically detect the cache as
+// outdated when loading the cached names.
 func SaveCache(today time.Time, names []string) error {
 	path, err := CacheFile()
 	if err != nil {
@@ -78,15 +87,16 @@ func SaveCache(today time.Time, names []string) error {
 	})
 }
 
+// CacheFile returns the path to the cache file.
 func CacheFile() (string, error) {
-	dir, err := CacheDir()
+	dir, err := cacheDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(dir, "latest.json"), nil
 }
 
-func CacheDir() (string, error) {
+func cacheDir() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir, err = os.UserHomeDir()
