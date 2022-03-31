@@ -4,9 +4,9 @@ SPDX-FileCopyrightText: 2022 Kalle Fagerberg
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
-# go-namnsdag
+# namnsdag
 
-[![REUSE status](https://api.reuse.software/badge/github.com/jilleJr/go-namnsdag)](https://api.reuse.software/info/github.com/jilleJr/go-namnsdag)
+[![REUSE status](https://api.reuse.software/badge/github.com/jilleJr/namnsdag)](https://api.reuse.software/info/github.com/jilleJr/namnsdag)
 
 ```console
 $ namnsdag
