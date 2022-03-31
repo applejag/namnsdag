@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -35,6 +36,11 @@ var (
 	colorPrefix = color.New(color.FgHiBlack)
 	colorText   = color.New(color.FgYellow)
 	colorStatus = color.New(color.FgHiBlack, color.Italic)
+
+	rootFlags = struct {
+		noFetch bool
+		noCache bool
+	}{}
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -64,16 +70,27 @@ func writeColored(text string) {
 }
 
 func loadOrFetchNames() ([]string, error) {
+	if rootFlags.noCache && rootFlags.noFetch {
+		return nil, errors.New("cannot use --no-cache and --no-fetch at the same time")
+	}
+
 	today := time.Now()
-	names, err := namnsdag.LoadCache(today)
-	if err != nil {
-		return nil, fmt.Errorf("load cached names: %w", err)
+
+	if !rootFlags.noCache {
+		names, err := namnsdag.LoadCache(today)
+		if err != nil {
+			return nil, fmt.Errorf("load cached names: %w", err)
+		}
+		if names != nil {
+			return names, nil
+		}
+		if rootFlags.noFetch {
+			return nil, errors.New("none or outdated cache, and skipping fetch because --no-fetch was supplied")
+		}
 	}
-	if names != nil {
-		return names, nil
-	}
+
 	colorStatus.Println("Fetching names from " + namnsdag.URL)
-	names, err = namnsdag.Fetch()
+	names, err := namnsdag.Fetch()
 	if err != nil {
 		return nil, fmt.Errorf("fetch names: %w", err)
 	}
@@ -81,6 +98,7 @@ func loadOrFetchNames() ([]string, error) {
 		return nil, fmt.Errorf("cache names: %w", err)
 	}
 	return names, nil
+
 }
 
 // Execute is the entry point for running this command.
@@ -92,4 +110,6 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Flags().BoolVar(&rootFlags.noFetch, "no-fetch", false, "Skips fetching via HTTP.")
+	rootCmd.Flags().BoolVar(&rootFlags.noCache, "no-cache", false, "Skips loading from cache.")
 }

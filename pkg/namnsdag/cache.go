@@ -22,10 +22,16 @@ package namnsdag
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+)
+
+// Errors specific to the cache.
+var (
+	ErrCacheAlreadyCleared = errors.New("cache already cleared")
 )
 
 type cache struct {
@@ -85,6 +91,20 @@ func SaveCache(today time.Time, names []string) error {
 		Day:   today.Format("2006-01-02"),
 		Names: names,
 	})
+}
+
+// ClearCache will remove the cached names, if any. Returns
+// ErrCacheAlreadyCleared if no cache existed.
+func ClearCache() error {
+	path, err := CacheFile()
+	if err != nil {
+		return fmt.Errorf("get cache file path: %w", err)
+	}
+	err = os.Remove(path)
+	if os.IsNotExist(err) {
+		return ErrCacheAlreadyCleared
+	}
+	return err
 }
 
 // CacheFile returns the path to the cache file.
