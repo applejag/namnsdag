@@ -13,6 +13,9 @@ $ namnsdag
 Fetching names from https://www.dagensnamnsdag.nu/
 === Today's names: Erla*, Essy*, Ester, Kenji*, Lenore*, Scilla*
 
+$ namnsdag --no-unofficial
+=== Today's names: Ester
+
 $ namnsdag --help
 Simple CLI for fetching the list of names to celebrate today.
 
@@ -23,9 +26,10 @@ Usage:
   namnsdag [flags]
 
 Flags:
-  -h, --help   help for namnsdag
-      --no-cache   Skips loading from cache.
-      --no-fetch   Skips fetching via HTTP.
+  -h, --help            help for namnsdag
+      --no-cache        Skips loading from cache.
+      --no-fetch        Skips fetching via HTTP.
+      --no-unofficial   Skips showing unofficial namnsdagar, aka "Bolibompa namnsdagar".
 ```
 
 ## Install
