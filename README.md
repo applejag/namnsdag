@@ -41,4 +41,4 @@ go install github.com/jilleJr/namnsdag@latest
 This project is primarily licensed under the GNU General Public License v3.0 or
 later (GPL-3.0-or-later).
 
-Copyright &copy; Kalle Fagerberg
+Copyright © Kalle Fagerberg

@@ -38,8 +38,9 @@ var (
 	colorStatus = color.New(color.FgHiBlack, color.Italic)
 
 	rootFlags = struct {
-		noFetch bool
-		noCache bool
+		noFetch      bool
+		noCache      bool
+		noUnofficial bool
 	}{}
 )
 
@@ -55,6 +56,9 @@ and cache the results inside ~/.cache/namnsdag/`,
 		names, err := loadOrFetchNames()
 		if err != nil {
 			return err
+		}
+		if rootFlags.noUnofficial {
+			names = filterOnlyOfficial(names)
 		}
 		writeColored(fmt.Sprintf("Today's names: %s", strings.Join(names, ", ")))
 		return nil
@@ -98,7 +102,16 @@ func loadOrFetchNames() ([]string, error) {
 		return nil, fmt.Errorf("cache names: %w", err)
 	}
 	return names, nil
+}
 
+func filterOnlyOfficial(names []string) []string {
+	var filtered []string
+	for _, name := range names {
+		if !strings.HasSuffix(name, "*") {
+			filtered = append(filtered, name)
+		}
+	}
+	return filtered
 }
 
 // Execute is the entry point for running this command.
@@ -112,4 +125,5 @@ func Execute() {
 func init() {
 	rootCmd.Flags().BoolVar(&rootFlags.noFetch, "no-fetch", false, "Skips fetching via HTTP.")
 	rootCmd.Flags().BoolVar(&rootFlags.noCache, "no-cache", false, "Skips loading from cache.")
+	rootCmd.Flags().BoolVar(&rootFlags.noUnofficial, "no-unofficial", false, `Skips showing unofficial namnsdagar, aka "Bolibompa namnsdagar".`)
 }
