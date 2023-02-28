@@ -42,7 +42,7 @@ func Fetch() ([]string, error) {
 	var names []string
 	doc.Find(".primary>div>p").Each(func(i int, s *goquery.Selection) {
 		class, ok := s.Attr("class")
-		if !ok || !strings.HasPrefix(class, "home_todaysNames") {
+		if !ok || !strings.HasPrefix(class, "index_todaysNames") {
 			return
 		}
 		names = append(names, getNames(s)...)
