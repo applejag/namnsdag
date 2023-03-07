@@ -30,7 +30,7 @@ import (
 )
 
 // URL is the HTTP URL that namnsdag.Fetch will query.
-const URL = "https://www.dagensnamnsdag.nu/"
+const URL = "https://dagensnamnsdag.nu/"
 
 // Fetch performs a HTTP GET request and parses the HTML response to extract
 // today's names.
@@ -40,7 +40,7 @@ func Fetch() ([]string, error) {
 		return nil, err
 	}
 	var names []string
-	doc.Find(".primary>div>p").Each(func(i int, s *goquery.Selection) {
+	doc.Find(".container>div>p").Each(func(i int, s *goquery.Selection) {
 		class, ok := s.Attr("class")
 		if !ok || !strings.HasPrefix(class, "index_todaysNames") {
 			return
