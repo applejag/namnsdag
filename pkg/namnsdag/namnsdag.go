@@ -40,7 +40,7 @@ func Fetch() ([]string, error) {
 		return nil, err
 	}
 	var names []string
-	doc.Find(".container>div>p").Each(func(i int, s *goquery.Selection) {
+	doc.Find(".container p").Each(func(i int, s *goquery.Selection) {
 		class, ok := s.Attr("class")
 		if !ok || !strings.HasPrefix(class, "index_todaysNames") {
 			return
