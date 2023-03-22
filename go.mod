@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
-module github.com/jilleJr/namnsdag
+module github.com/jilleJr/namnsdag/v2
 
-go 1.18
+go 1.20
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0

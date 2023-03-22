@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jilleJr/namnsdag/pkg/namnsdag"
+	"github.com/jilleJr/namnsdag/v2/pkg/namnsdag"
 	"github.com/spf13/cobra"
 )
 
