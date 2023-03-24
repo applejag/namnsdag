@@ -18,6 +18,7 @@
 // You should have received a copy of the GNU General Public License along
 // with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Package cmd is the command-line definitions of all commands.
 package cmd
 
 import (
@@ -28,7 +29,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jilleJr/namnsdag/pkg/namnsdag"
+	"github.com/jilleJr/namnsdag/v2/pkg/namnsdag"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +37,11 @@ var (
 	colorPrefix = color.New(color.FgHiBlack)
 	colorText   = color.New(color.FgYellow)
 	colorStatus = color.New(color.FgHiBlack, color.Italic)
+
+	colorNameOfficial         = color.New(color.FgHiCyan)
+	colorNameUnofficial       = color.New(color.FgCyan, color.Italic)
+	colorNameUnofficialSymbol = color.New(color.FgMagenta, color.Italic)
+	colorNameDelimiter        = color.New(color.FgHiBlack)
 
 	rootFlags = struct {
 		noFetch      bool
@@ -60,7 +66,7 @@ and cache the results inside ~/.cache/namnsdag/`,
 		if rootFlags.noUnofficial {
 			names = filterOnlyOfficial(names)
 		}
-		writeColored(fmt.Sprintf("Today's names: %s", strings.Join(names, ", ")))
+		writeColored(fmt.Sprintf("Today's names: %s", joinNames(names)))
 		return nil
 	},
 }
@@ -73,7 +79,23 @@ func writeColored(text string) {
 	fmt.Println(sb.String())
 }
 
-func loadOrFetchNames() ([]string, error) {
+func joinNames(names []namnsdag.Name) string {
+	var sb strings.Builder
+	for i, name := range names {
+		if i > 0 {
+			colorNameDelimiter.Fprint(&sb, ", ")
+		}
+		if name.TypeOfName != namnsdag.TypeNewName {
+			colorNameOfficial.Fprint(&sb, name.Name)
+		} else {
+			colorNameUnofficial.Fprint(&sb, name.Name)
+			colorNameUnofficialSymbol.Fprint(&sb, "*")
+		}
+	}
+	return sb.String()
+}
+
+func loadOrFetchNames() ([]namnsdag.Name, error) {
 	if rootFlags.noCache && rootFlags.noFetch {
 		return nil, errors.New("cannot use --no-cache and --no-fetch at the same time")
 	}
@@ -94,7 +116,7 @@ func loadOrFetchNames() ([]string, error) {
 	}
 
 	colorStatus.Println("Fetching names from " + namnsdag.URL)
-	names, err := namnsdag.Fetch()
+	names, err := namnsdag.FetchToday()
 	if err != nil {
 		return nil, fmt.Errorf("fetch names: %w", err)
 	}
@@ -104,10 +126,10 @@ func loadOrFetchNames() ([]string, error) {
 	return names, nil
 }
 
-func filterOnlyOfficial(names []string) []string {
-	var filtered []string
+func filterOnlyOfficial(names []namnsdag.Name) []namnsdag.Name {
+	var filtered []namnsdag.Name
 	for _, name := range names {
-		if !strings.HasSuffix(name, "*") {
+		if name.TypeOfName != namnsdag.TypeNewName {
 			filtered = append(filtered, name)
 		}
 	}

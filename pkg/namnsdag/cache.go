@@ -35,30 +35,40 @@ var (
 )
 
 type cache struct {
+	Day   string `json:"day"`
+	Names []Name `json:"names"`
+}
+
+type cachev1 struct {
 	Day   string   `json:"day"`
 	Names []string `json:"names"`
 }
 
 // LoadCache loads the cached names from ~/.cache/namnsdag/latest.json, or the
-// equivalent in other OS's cache directories (eg. %APPDATA%).
+// equivalent in other OS's cache directories (eg. %LOCALAPPDATA%).
 //
 // It will return nil if there is no cache or if the cache is outdated.
-func LoadCache(today time.Time) ([]string, error) {
+func LoadCache(today time.Time) ([]Name, error) {
 	path, err := CacheFile()
 	if err != nil {
 		return nil, fmt.Errorf("get cache file path: %w", err)
 	}
-	file, err := os.Open(path)
+	fileBytes, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	dec := json.NewDecoder(file)
 	var cache cache
-	if err := dec.Decode(&cache); err != nil {
-		return nil, err
+	if err := json.Unmarshal(fileBytes, &cache); err != nil {
+		// Maybe v1 cache format
+		var cachev1 cachev1
+		if errv1 := json.Unmarshal(fileBytes, &cachev1); errv1 != nil {
+			// If even that failed, return original error
+			return nil, err
+		}
+		// If cachev1 succeeded, just consider it out of date
+		return nil, nil
 	}
 	if cache.Day != today.Format("2006-01-02") {
 		// Cache is out of date
@@ -68,11 +78,11 @@ func LoadCache(today time.Time) ([]string, error) {
 }
 
 // SaveCache writes the cached names to ~/.cache/namnsdag/latest.json, or the
-// equivalent in other OS's cache directories (eg. %APPDATA%).
+// equivalent in other OS's cache directories (eg. %LOCALAPPDATA%).
 //
 // Today's year, month, and day are used to automatically detect the cache as
 // outdated when loading the cached names.
-func SaveCache(today time.Time, names []string) error {
+func SaveCache(today time.Time, names []Name) error {
 	path, err := CacheFile()
 	if err != nil {
 		return fmt.Errorf("get cache file path: %w", err)

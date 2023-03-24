@@ -18,13 +18,16 @@
 // You should have received a copy of the GNU General Public License along
 // with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Package namnsdag contains functions to programatically retrieve today's names,
+// as well as caching them.
 package namnsdag
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
-	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -32,31 +35,83 @@ import (
 // URL is the HTTP URL that namnsdag.Fetch will query.
 const URL = "https://dagensnamnsdag.nu/"
 
-// Fetch performs a HTTP GET request and parses the HTML response to extract
-// today's names.
-func Fetch() ([]string, error) {
+// Name contains fields for a given name.
+type Name struct {
+	URL        string     `json:"url"`
+	Name       string     `json:"name"`
+	Day        int        `json:"day"`
+	Month      time.Month `json:"month"`
+	TypeOfName Type       `json:"typeOfName"`
+	Gender     Gender     `json:"gender"`
+}
+
+// Type is an enum stating what kind of namnsdag-name it is.
+type Type string
+
+// Known values for [Type]. There may be other values from
+// [https://dagensnamnsdag.nu], but these are the ones found so far.
+const (
+	TypeName    Type = "NAME"
+	TypeNewName Type = "NEW_NAME"
+)
+
+// Gender is an enum stating what gender a namnsdag-name has, if any.
+type Gender string
+
+// Known values for [Gender]. There may be other values from
+// [https://dagensnamnsdag.nu], but these are the ones found so far.
+const (
+	GenderBoth   Gender = "BOTH"
+	GenderBoy    Gender = "BOY"
+	GenderGirl   Gender = "GIRL"
+	GenderNotSet Gender = "NOT_SET"
+)
+
+// FetchToday performs a HTTP GET request and parses the HTML response
+// to extract today's names.
+func FetchToday() ([]Name, error) {
+	data, err := fetchTodayNextJSData()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	todaysDay := now.Day()
+	todaysMonth := now.Month()
+
+	var names []Name
+	for _, name := range data.Props.PageProps.Names {
+		if name.Day == todaysDay && name.Month == todaysMonth {
+			names = append(names, name)
+		}
+	}
+	sort.Slice(names, func(i, j int) bool {
+		return names[i].Name < names[j].Name
+	})
+	return names, nil
+}
+
+type nextJSData struct {
+	Props struct {
+		PageProps struct {
+			Names []Name `json:"names"`
+		} `json:"pageProps"`
+	} `json:"props"`
+}
+
+func fetchTodayNextJSData() (*nextJSData, error) {
 	doc, err := fetchDocument()
 	if err != nil {
 		return nil, err
 	}
-	var names []string
-	doc.Find(".container p").Each(func(i int, s *goquery.Selection) {
-		class, ok := s.Attr("class")
-		if !ok || !strings.HasPrefix(class, "index_todaysNames") {
-			return
-		}
-		names = append(names, getNames(s)...)
-	})
-	sort.Strings(names)
-	return names, nil
-}
-
-func getNames(s *goquery.Selection) []string {
-	var names []string
-	s.Find("a[href]").Each(func(i int, s *goquery.Selection) {
-		names = append(names, s.Text())
-	})
-	return names
+	q := doc.Find(`script[id="__NEXT_DATA__"]`).First()
+	if len(q.Nodes) == 0 {
+		return nil, fmt.Errorf("no <script id='__NEXT_DATA__'> tag found")
+	}
+	var data nextJSData
+	if err := json.Unmarshal([]byte(q.Text()), &data); err != nil {
+		return nil, fmt.Errorf("parsing JSON in <script id='__NEXT_DATA__'> tag: %w", err)
+	}
+	return &data, nil
 }
 
 func fetchDocument() (*goquery.Document, error) {

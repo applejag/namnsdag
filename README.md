@@ -34,10 +34,10 @@ Flags:
 
 ## Install
 
-Requires Go 1.18 or higher.
+Requires Go 1.20 or higher.
 
 ```sh
-go install github.com/jilleJr/namnsdag@latest
+go install github.com/jilleJr/namnsdag/v2@latest
 ```
 
 ## License
