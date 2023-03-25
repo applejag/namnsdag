@@ -32,8 +32,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// URL is the HTTP URL that namnsdag.Fetch will query.
-const URL = "https://dagensnamnsdag.nu/"
+// URL is the HTTP URL of the website to find data from.
+const URL = "https://dagensnamnsdag.nu/namnsdagar"
 
 // Name contains fields for a given name.
 type Name struct {
@@ -70,7 +70,7 @@ const (
 // FetchToday performs a HTTP GET request and parses the HTML response
 // to extract today's names.
 func FetchToday() ([]Name, error) {
-	data, err := fetchTodayNextJSData()
+	data, err := fetchAllNextJSData()
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ type nextJSData struct {
 	} `json:"props"`
 }
 
-func fetchTodayNextJSData() (*nextJSData, error) {
+func fetchAllNextJSData() (*nextJSData, error) {
 	doc, err := fetchDocument()
 	if err != nil {
 		return nil, err
