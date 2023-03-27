@@ -80,10 +80,12 @@ const (
 	GenderNotSet Gender = "NOT_SET"
 )
 
+// Request is the model used for a [Fetch] of names from [URL].
 type Request struct {
 	ETag string
 }
 
+// Response is the data received from a [Fetch] of names from [URL].
 type Response struct {
 	Names []Name
 	ETag  string

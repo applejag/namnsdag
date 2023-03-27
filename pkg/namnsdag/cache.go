@@ -172,7 +172,7 @@ func CacheFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "latest.json"), nil
+	return filepath.Join(dir, "cache@v3.json"), nil
 }
 
 func cacheDir() (string, error) {
