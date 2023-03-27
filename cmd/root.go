@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jilleJr/namnsdag/v2/pkg/namnsdag"
+	"github.com/jilleJr/namnsdag/v3/pkg/namnsdag"
 	"github.com/spf13/cobra"
 )
 
@@ -37,11 +37,13 @@ var (
 	colorPrefix = color.New(color.FgHiBlack)
 	colorText   = color.New(color.FgYellow)
 	colorStatus = color.New(color.FgHiBlack, color.Italic)
+	colorError  = color.New(color.FgRed)
 
 	colorNameOfficial         = color.New(color.FgHiCyan)
 	colorNameUnofficial       = color.New(color.FgCyan, color.Italic)
 	colorNameUnofficialSymbol = color.New(color.FgMagenta, color.Italic)
 	colorNameDelimiter        = color.New(color.FgHiBlack)
+	colorNameNone             = color.New(color.FgRed, color.Italic)
 
 	rootFlags = struct {
 		noFetch      bool
@@ -59,12 +61,18 @@ var rootCmd = &cobra.Command{
 When run, it will query https://www.dagensnamnsdag.nu/ to obtain today's names,
 and cache the results inside ~/.cache/namnsdag/`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		names, err := loadOrFetchNames()
+		namesPerDay, err := loadOrFetchNames()
 		if err != nil {
 			return err
 		}
+		dom := namnsdag.NewDoMFromTime(time.Now())
+		names := namesPerDay[dom]
 		if rootFlags.noUnofficial {
 			names = filterOnlyOfficial(names)
+		}
+		if len(names) == 0 {
+			writeColored(fmt.Sprintf("Today's names: %s", colorNameNone.Sprint("no names found for today")))
+			return nil
 		}
 		writeColored(fmt.Sprintf("Today's names: %s", joinNames(names)))
 		return nil
@@ -95,35 +103,58 @@ func joinNames(names []namnsdag.Name) string {
 	return sb.String()
 }
 
-func loadOrFetchNames() ([]namnsdag.Name, error) {
+func loadOrFetchNames() (map[namnsdag.DoM][]namnsdag.Name, error) {
 	if rootFlags.noCache && rootFlags.noFetch {
 		return nil, errors.New("cannot use --no-cache and --no-fetch at the same time")
 	}
 
-	today := time.Now()
+	var cache namnsdag.Cache
 
 	if !rootFlags.noCache {
-		names, err := namnsdag.LoadCache(today)
+		c, err := namnsdag.LoadCache()
 		if err != nil {
 			return nil, fmt.Errorf("load cached names: %w", err)
 		}
-		if names != nil {
-			return names, nil
-		}
-		if rootFlags.noFetch {
-			return nil, errors.New("none or outdated cache, and skipping fetch because --no-fetch was supplied")
-		}
+		cache = c
 	}
 
-	colorStatus.Println("Fetching names from " + namnsdag.URL)
-	names, err := namnsdag.FetchToday()
+	isCacheValid := len(cache.NamesPerDay) > 0
+	if isCacheValid && rootFlags.noFetch {
+		return cache.NamesPerDay, nil
+	}
+
+	isCacheOutdated := !isCacheValid || cache.UpdatedAt.Before(time.Now().Truncate(24*time.Hour))
+	if isCacheOutdated && rootFlags.noFetch {
+		return nil, errors.New("none or outdated cache, and skipping fetch because --no-fetch was supplied")
+	}
+
+	if !isCacheOutdated {
+		return cache.NamesPerDay, nil
+	}
+
+	req := namnsdag.Request{ETag: cache.ETag}
+	if !isCacheValid {
+		req.ETag = ""
+	}
+
+	colorStatus.Printf("Fetching names from %s... ", namnsdag.URL)
+	resp, err := namnsdag.Fetch(req)
+	if errors.Is(err, namnsdag.ErrHTTPNotModified) && isCacheValid {
+		colorStatus.Println("cache is up-to-date")
+		return cache.NamesPerDay, nil
+	}
 	if err != nil {
+		colorError.Println("error")
 		return nil, fmt.Errorf("fetch names: %w", err)
 	}
-	if err := namnsdag.SaveCache(today, names); err != nil {
+	colorStatus.Printf("fetched %d names\n", len(resp.Names))
+	cache.SetNames(resp.Names)
+	cache.UpdatedAt = time.Now()
+	cache.ETag = resp.ETag
+	if err := namnsdag.SaveCache(cache); err != nil {
 		return nil, fmt.Errorf("cache names: %w", err)
 	}
-	return names, nil
+	return cache.NamesPerDay, nil
 }
 
 func filterOnlyOfficial(names []namnsdag.Name) []namnsdag.Name {

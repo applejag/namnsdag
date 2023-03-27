@@ -18,9 +18,11 @@
 // You should have received a copy of the GNU General Public License along
 // with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Package main is the entrypoint for this module. It launches the CLI from the
+// cmd package.
 package main
 
-import "github.com/jilleJr/namnsdag/v2/cmd"
+import "github.com/jilleJr/namnsdag/v3/cmd"
 
 func main() {
 	cmd.Execute()

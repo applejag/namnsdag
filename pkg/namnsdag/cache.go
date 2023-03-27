@@ -21,6 +21,7 @@
 package namnsdag
 
 import (
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,47 +35,92 @@ var (
 	ErrCacheAlreadyCleared = errors.New("cache already cleared")
 )
 
-type cache struct {
-	Day   string `json:"day"`
-	Names []Name `json:"names"`
+// Cache is the model representing the cached data.
+type Cache struct {
+	ETag        string         `json:"etag"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	NamesPerDay map[DoM][]Name `json:"namesPerDay"`
 }
 
-type cachev1 struct {
-	Day   string   `json:"day"`
-	Names []string `json:"names"`
+// SetNames replaces the names of the map.
+func (c *Cache) SetNames(names []Name) {
+	c.NamesPerDay = nil
+	c.AddNames(names)
+}
+
+// AddNames adds names to the map of names, on their appropriate dates.
+func (c *Cache) AddNames(names []Name) {
+	if c.NamesPerDay == nil {
+		c.NamesPerDay = make(map[DoM][]Name, len(names))
+	}
+	for _, name := range names {
+		dom := NewDoM(name.Month, name.Day)
+		c.NamesPerDay[dom] = append(c.NamesPerDay[dom], name)
+	}
+}
+
+// DoM (Day-of-Month) represents a day in a month, no matter what year.
+type DoM struct {
+	Day   int
+	Month time.Month
+}
+
+var _ encoding.TextMarshaler = DoM{}
+var _ encoding.TextUnmarshaler = &DoM{}
+
+// MarshalText implements [encoding.TextMarshaler]
+func (d DoM) MarshalText() (text []byte, err error) {
+	return fmt.Appendf(nil, "%02d-%02d", d.Month, d.Day), nil
+}
+
+// UnmarshalText implements [encoding.TextUnmarshaler]
+func (d *DoM) UnmarshalText(text []byte) error {
+	_, err := fmt.Sscanf(string(text), "%02d-%02d", &d.Month, &d.Day)
+	return err
+}
+
+// String implements [fmt.Stringer]
+func (d DoM) String() string {
+	b, _ := d.MarshalText()
+	return string(b)
+}
+
+// NewDoMFromTime creates a new [DoM] based on the month and day in the
+// given time. The year, as well as any hours, minutes, seconds, milliseconds,
+// and time zone is ignored.
+func NewDoMFromTime(t time.Time) DoM {
+	_, month, day := t.Date()
+	return NewDoM(month, day)
+}
+
+// NewDoM creates a new [DoM] based on the month and the day.
+func NewDoM(month time.Month, day int) DoM {
+	return DoM{
+		Day:   day,
+		Month: month,
+	}
 }
 
 // LoadCache loads the cached names from ~/.cache/namnsdag/latest.json, or the
 // equivalent in other OS's cache directories (eg. %LOCALAPPDATA%).
 //
 // It will return nil if there is no cache or if the cache is outdated.
-func LoadCache(today time.Time) ([]Name, error) {
+func LoadCache() (Cache, error) {
 	path, err := CacheFile()
 	if err != nil {
-		return nil, fmt.Errorf("get cache file path: %w", err)
+		return Cache{}, fmt.Errorf("get cache file path: %w", err)
 	}
 	fileBytes, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return Cache{}, nil
 	} else if err != nil {
-		return nil, err
+		return Cache{}, err
 	}
-	var cache cache
+	var cache Cache
 	if err := json.Unmarshal(fileBytes, &cache); err != nil {
-		// Maybe v1 cache format
-		var cachev1 cachev1
-		if errv1 := json.Unmarshal(fileBytes, &cachev1); errv1 != nil {
-			// If even that failed, return original error
-			return nil, err
-		}
-		// If cachev1 succeeded, just consider it out of date
-		return nil, nil
+		return Cache{}, err
 	}
-	if cache.Day != today.Format("2006-01-02") {
-		// Cache is out of date
-		return nil, nil
-	}
-	return cache.Names, nil
+	return cache, nil
 }
 
 // SaveCache writes the cached names to ~/.cache/namnsdag/latest.json, or the
@@ -82,7 +128,7 @@ func LoadCache(today time.Time) ([]Name, error) {
 //
 // Today's year, month, and day are used to automatically detect the cache as
 // outdated when loading the cached names.
-func SaveCache(today time.Time, names []Name) error {
+func SaveCache(cache Cache) error {
 	path, err := CacheFile()
 	if err != nil {
 		return fmt.Errorf("get cache file path: %w", err)
@@ -96,11 +142,14 @@ func SaveCache(today time.Time, names []Name) error {
 		return err
 	}
 	defer file.Close()
+
+	if cache.UpdatedAt == (time.Time{}) {
+		cache.UpdatedAt = time.Now()
+	}
+
 	enc := json.NewEncoder(file)
-	return enc.Encode(cache{
-		Day:   today.Format("2006-01-02"),
-		Names: names,
-	})
+	enc.SetIndent("", "  ")
+	return enc.Encode(cache)
 }
 
 // ClearCache will remove the cached names, if any. Returns
@@ -123,7 +172,7 @@ func CacheFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "latest.json"), nil
+	return filepath.Join(dir, "cache@v3.json"), nil
 }
 
 func cacheDir() (string, error) {
