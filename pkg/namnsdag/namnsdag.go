@@ -24,6 +24,7 @@ package namnsdag
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -32,8 +33,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// URL is the HTTP URL of the website to find data from.
-const URL = "https://dagensnamnsdag.nu/namnsdagar"
+var (
+	// URL is the HTTP URL of the website to find data from.
+	URL = "https://dagensnamnsdag.nu/namnsdagar"
+
+	// ErrHTTPNotModified is returned from [Fetch] when the server responded
+	// with status "304 not modified", which means that the etag matched
+	// and our local cache is up to date.
+	ErrHTTPNotModified = errors.New("http status: 304 not modified")
+)
 
 // Name contains fields for a given name.
 type Name struct {
@@ -43,6 +51,11 @@ type Name struct {
 	Month      time.Month `json:"month"`
 	TypeOfName Type       `json:"typeOfName"`
 	Gender     Gender     `json:"gender"`
+}
+
+// DoM returns this name's Day-of-Month.
+func (n Name) DoM() DoM {
+	return NewDoM(n.Month, n.Day)
 }
 
 // Type is an enum stating what kind of namnsdag-name it is.
@@ -67,27 +80,47 @@ const (
 	GenderNotSet Gender = "NOT_SET"
 )
 
-// FetchToday performs a HTTP GET request and parses the HTML response
-// to extract today's names.
-func FetchToday() ([]Name, error) {
-	data, err := fetchAllNextJSData()
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	todaysDay := now.Day()
-	todaysMonth := now.Month()
+type Request struct {
+	ETag string
+}
 
-	var names []Name
-	for _, name := range data.Props.PageProps.Names {
-		if name.Day == todaysDay && name.Month == todaysMonth {
-			names = append(names, name)
-		}
+type Response struct {
+	Names []Name
+	ETag  string
+}
+
+// Fetch performs a HTTP GET request and parses the HTML response
+// to extract all names.
+func Fetch(req Request) (Response, error) {
+	data, etag, err := fetchAllNextJSData(req.ETag)
+	if errors.Is(err, ErrHTTPNotModified) {
+		return Response{ETag: etag}, err
 	}
+	if err != nil {
+		return Response{}, err
+	}
+	names := data.Props.PageProps.Names
+	SortNames(names)
+	return Response{
+		Names: names,
+		ETag:  etag,
+	}, nil
+}
+
+// SortNames will sort a slice of names first by month, then by day, and finally
+// by name, all in ascending order.
+func SortNames(names []Name) {
 	sort.Slice(names, func(i, j int) bool {
+		diffMonths := names[i].Month != names[j].Month
+		if diffMonths {
+			return names[i].Month < names[j].Month
+		}
+		diffDays := names[i].Day != names[j].Day
+		if diffDays {
+			return names[i].Day < names[j].Day
+		}
 		return names[i].Name < names[j].Name
 	})
-	return names, nil
 }
 
 type nextJSData struct {
@@ -98,30 +131,47 @@ type nextJSData struct {
 	} `json:"props"`
 }
 
-func fetchAllNextJSData() (*nextJSData, error) {
-	doc, err := fetchDocument()
+func fetchAllNextJSData(etag string) (*nextJSData, string, error) {
+	doc, newEtag, err := fetchDocument(etag)
+	if errors.Is(err, ErrHTTPNotModified) {
+		return nil, etag, err
+	}
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	q := doc.Find(`script[id="__NEXT_DATA__"]`).First()
 	if len(q.Nodes) == 0 {
-		return nil, fmt.Errorf("no <script id='__NEXT_DATA__'> tag found")
+		return nil, "", fmt.Errorf("no <script id='__NEXT_DATA__'> tag found")
 	}
 	var data nextJSData
 	if err := json.Unmarshal([]byte(q.Text()), &data); err != nil {
-		return nil, fmt.Errorf("parsing JSON in <script id='__NEXT_DATA__'> tag: %w", err)
+		return nil, "", fmt.Errorf("parsing JSON in <script id='__NEXT_DATA__'> tag: %w", err)
 	}
-	return &data, nil
+	return &data, newEtag, nil
 }
 
-func fetchDocument() (*goquery.Document, error) {
-	resp, err := http.Get(URL)
+func fetchDocument(etag string) (*goquery.Document, string, error) {
+	req, err := http.NewRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	if etag != "" {
+		req.Header.Add("If-None-Match", etag)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("non-2xx status code: %s", resp.Status)
+	if resp.StatusCode == http.StatusNotModified {
+		return nil, "", ErrHTTPNotModified
 	}
-	return goquery.NewDocumentFromReader(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("non-2xx status code: %s", resp.Status)
+	}
+	q, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse HTML: %w", err)
+	}
+	return q, resp.Header.Get("etag"), nil
 }
