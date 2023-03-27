@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
-module github.com/jilleJr/namnsdag/v2
+module github.com/jilleJr/namnsdag/v3
 
 go 1.20
 
