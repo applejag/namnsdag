@@ -63,20 +63,41 @@ and cache the results inside ~/.cache/namnsdag/`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		namesPerDay, err := loadOrFetchNames()
 		if err != nil {
-			return err
-		}
-		dom := namnsdag.NewDoMFromTime(time.Now())
-		names := namesPerDay[dom]
-		if rootFlags.noUnofficial {
-			names = filterOnlyOfficial(names)
-		}
-		if len(names) == 0 {
-			writeColored(fmt.Sprintf("Today's names: %s", colorNameNone.Sprint("no names found for today")))
+			if namesPerDay != nil {
+				colorStatus.Println("Found cached names, but they might be outdated.")
+				writeNames(namesForToday(namesPerDay))
+			}
+			writeError(err)
+			os.Exit(1)
 			return nil
 		}
-		writeColored(fmt.Sprintf("Today's names: %s", joinNames(names)))
+		writeNames(namesForToday(namesPerDay))
 		return nil
 	},
+	SilenceErrors: true,
+	SilenceUsage: true,
+}
+
+func writeError(err error) {
+	colorPrefix.Print("Error: ")
+	colorError.Println(err)
+}
+
+func namesForToday(namesPerDay map[namnsdag.DoM][]namnsdag.Name) []namnsdag.Name {
+	dom := namnsdag.NewDoMFromTime(time.Now())
+	names := namesPerDay[dom]
+	if rootFlags.noUnofficial {
+		names = filterOnlyOfficial(names)
+	}
+	return names
+}
+
+func writeNames(names []namnsdag.Name) {
+	if len(names) == 0 {
+		writeColored(fmt.Sprintf("Today's names: %s", colorNameNone.Sprint("no names found for today")))
+		return
+	}
+	writeColored(fmt.Sprintf("Today's names: %s", joinNames(names)))
 }
 
 func writeColored(text string) {
@@ -145,14 +166,14 @@ func loadOrFetchNames() (map[namnsdag.DoM][]namnsdag.Name, error) {
 	}
 	if err != nil {
 		colorError.Println("error")
-		return nil, fmt.Errorf("fetch names: %w", err)
+		return cache.NamesPerDay, fmt.Errorf("fetch names: %w", err)
 	}
 	colorStatus.Printf("fetched %d names\n", len(resp.Names))
 	cache.SetNames(resp.Names)
 	cache.UpdatedAt = time.Now()
 	cache.ETag = resp.ETag
 	if err := namnsdag.SaveCache(cache); err != nil {
-		return nil, fmt.Errorf("cache names: %w", err)
+		return cache.NamesPerDay, fmt.Errorf("cache names: %w", err)
 	}
 	return cache.NamesPerDay, nil
 }
@@ -171,6 +192,7 @@ func filterOnlyOfficial(names []namnsdag.Name) []namnsdag.Name {
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		writeError(err)
 		os.Exit(1)
 	}
 }
