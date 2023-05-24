@@ -54,28 +54,37 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "namnsdag",
+	Use:   "namnsdag [YYYY-MM-DD]",
 	Short: "Simple CLI for fetching the list of names to celebrate today",
 	Long: `Simple CLI for fetching the list of names to celebrate today.
 
 When run, it will query https://www.dagensnamnsdag.nu/ to obtain today's names,
 and cache the results inside ~/.cache/namnsdag/`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		day := time.Now()
+		if len(args) == 1 {
+			var err error
+			day, err = time.Parse(time.DateOnly, args[0])
+			if err != nil {
+				return fmt.Errorf("parse argument: %w", err)
+			}
+		}
 		namesPerDay, err := loadOrFetchNames()
 		if err != nil {
 			if namesPerDay != nil {
 				colorStatus.Println("Found cached names, but they might be outdated.")
-				writeNames(namesForToday(namesPerDay))
+				writeNames(namesForToday(namesPerDay, day), day)
 			}
 			writeError(err)
 			os.Exit(1)
 			return nil
 		}
-		writeNames(namesForToday(namesPerDay))
+		writeNames(namesForToday(namesPerDay, day), day)
 		return nil
 	},
 	SilenceErrors: true,
-	SilenceUsage: true,
+	SilenceUsage:  true,
 }
 
 func writeError(err error) {
@@ -83,8 +92,8 @@ func writeError(err error) {
 	colorError.Println(err)
 }
 
-func namesForToday(namesPerDay map[namnsdag.DoM][]namnsdag.Name) []namnsdag.Name {
-	dom := namnsdag.NewDoMFromTime(time.Now())
+func namesForToday(namesPerDay map[namnsdag.DoM][]namnsdag.Name, today time.Time) []namnsdag.Name {
+	dom := namnsdag.NewDoMFromTime(today)
 	names := namesPerDay[dom]
 	if rootFlags.noUnofficial {
 		names = filterOnlyOfficial(names)
@@ -92,12 +101,23 @@ func namesForToday(namesPerDay map[namnsdag.DoM][]namnsdag.Name) []namnsdag.Name
 	return names
 }
 
-func writeNames(names []namnsdag.Name) {
+func writeNames(names []namnsdag.Name, day time.Time) {
+	prefix := "Today's names"
+	if !sameDate(day, time.Now()) {
+		prefix = fmt.Sprintf("Names for %s", day.Format(time.DateOnly))
+	}
+
 	if len(names) == 0 {
-		writeColored(fmt.Sprintf("Today's names: %s", colorNameNone.Sprint("no names found for today")))
+		writeColored(fmt.Sprintf("%s: %s", prefix, colorNameNone.Sprint("no names found for today")))
 		return
 	}
-	writeColored(fmt.Sprintf("Today's names: %s", joinNames(names)))
+	writeColored(fmt.Sprintf("%s: %s", prefix, joinNames(names)))
+}
+
+func sameDate(a, b time.Time) bool {
+	y1, m1, d1 := a.Date()
+	y2, m2, d2 := b.Date()
+	return y1 == y2 && m1 == m2 && d1 == d2
 }
 
 func writeColored(text string) {
