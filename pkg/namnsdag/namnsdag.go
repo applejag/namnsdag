@@ -47,12 +47,16 @@ var (
 
 // Name contains fields for a given name.
 type Name struct {
-	URL        string     `json:"url"`
-	Name       string     `json:"name"`
+	Slug       string     `json:"slug"`
+	Name       string     `json:"title"`
 	Day        int        `json:"day"`
 	Month      time.Month `json:"month"`
-	TypeOfName Type       `json:"typeOfName"`
-	Gender     Gender     `json:"gender"`
+	TypeOfName Type       `json:"type"`
+
+	// Deprecated: This field no longer exists on [https://dagensnamnsdag.nu]
+	URL string
+	// Deprecated: This field no longer exists on [https://dagensnamnsdag.nu]
+	Gender Gender
 }
 
 // DoM returns this name's Day-of-Month.
