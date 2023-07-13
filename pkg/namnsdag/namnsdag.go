@@ -41,6 +41,8 @@ var (
 	// with status "304 not modified", which means that the etag matched
 	// and our local cache is up to date.
 	ErrHTTPNotModified = errors.New("http status: 304 not modified")
+
+	ErrNameWasEmpty = errors.New("name was empty")
 )
 
 // Name contains fields for a given name.
@@ -102,11 +104,52 @@ func Fetch(req Request) (Response, error) {
 		return Response{}, err
 	}
 	names := data.Props.PageProps.Names
+	type InvalidName struct {
+		Name
+		Error error
+	}
+	var invalidNameDates []InvalidName
+	for _, name := range names {
+		if err := name.Validate(); err != nil {
+			invalidNameDates = append(invalidNameDates, InvalidName{
+				Name:  name,
+				Error: fmt.Errorf("%w (%s)", err, name.DoM()),
+			})
+		}
+	}
+	if len(invalidNameDates) > 0 {
+		switch len(invalidNameDates) {
+		case 1:
+			return Response{}, invalidNameDates[0].Error
+		case 2:
+			return Response{}, fmt.Errorf("%w, %w",
+				invalidNameDates[0].Error,
+				invalidNameDates[1].Error)
+		case 3:
+			return Response{}, fmt.Errorf("%w, %w, %w",
+				invalidNameDates[0].Error,
+				invalidNameDates[1].Error,
+				invalidNameDates[2].Error)
+		default:
+			return Response{}, fmt.Errorf("found %d errors, first 3: %w, %w, %w",
+				len(invalidNameDates),
+				invalidNameDates[0].Error,
+				invalidNameDates[1].Error,
+				invalidNameDates[2].Error)
+		}
+	}
 	SortNames(names)
 	return Response{
 		Names: names,
 		ETag:  etag,
 	}, nil
+}
+
+func (n Name) Validate() error {
+	if n.Name == "" {
+		return ErrNameWasEmpty
+	}
+	return nil
 }
 
 // SortNames will sort a slice of names first by month, then by day, and finally
