@@ -54,9 +54,9 @@ type Name struct {
 	TypeOfName Type       `json:"type"`
 
 	// Deprecated: This field no longer exists on [https://dagensnamnsdag.nu]
-	URL string
+	URL string `json:"-"`
 	// Deprecated: This field no longer exists on [https://dagensnamnsdag.nu]
-	Gender Gender
+	Gender Gender `json:"-"`
 }
 
 // DoM returns this name's Day-of-Month.
