@@ -70,8 +70,8 @@ type Type string
 // Known values for [Type]. There may be other values from
 // [https://dagensnamnsdag.nu], but these are the ones found so far.
 const (
-	TypeName    Type = "NAME"
-	TypeNewName Type = "NEW_NAME"
+	TypeOfficial   Type = "OFFICIAL"
+	TypeUnofficial Type = "UNOFFICIAL"
 )
 
 // Gender is an enum stating what gender a namnsdag-name has, if any.

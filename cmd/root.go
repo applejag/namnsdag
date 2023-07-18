@@ -134,7 +134,7 @@ func joinNames(names []namnsdag.Name) string {
 		if i > 0 {
 			colorNameDelimiter.Fprint(&sb, ", ")
 		}
-		if name.TypeOfName != namnsdag.TypeNewName {
+		if name.TypeOfName != namnsdag.TypeUnofficial {
 			colorNameOfficial.Fprint(&sb, name.Name)
 		} else {
 			colorNameUnofficial.Fprint(&sb, name.Name)
@@ -201,7 +201,7 @@ func loadOrFetchNames() (map[namnsdag.DoM][]namnsdag.Name, error) {
 func filterOnlyOfficial(names []namnsdag.Name) []namnsdag.Name {
 	var filtered []namnsdag.Name
 	for _, name := range names {
-		if name.TypeOfName != namnsdag.TypeNewName {
+		if name.TypeOfName != namnsdag.TypeUnofficial {
 			filtered = append(filtered, name)
 		}
 	}
